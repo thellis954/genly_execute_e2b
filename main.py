@@ -6,6 +6,7 @@ from e2b import CodeInterpreter
 import os
 import asyncio
 import json
+from PIL import Image
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,9 +44,14 @@ def execute_code(code, packages=None):
         code_pkgs = packages[12:]
         sandbox.install_python_packages(code_pkgs)
         
-    stdout, stderr, artifacts = sandbox.run_python(code)
+    stdout, stderr, artifacts_temp = sandbox.run_python(code)
+    artifacts = []
+    for artifact in artifacts_temp:
+        file = artifact.download()
+        artifacts.append(file)
     sandbox.close()
     return stdout, stderr, artifacts
+
 
 # Streamlit app
 async def main():
@@ -81,11 +87,21 @@ async def main():
             code = response[code_start + 9:code_end].strip()
 
             # Execute the code using E2B
-            output = execute_code(code, packages)
+            output, errors, artifacts = execute_code(code, packages)
 
             # Display the execution output
             st.write("Execution Output:")
             st.write(output)
+            while errors:
+                response, conversation_id = await send_message(f"Please correct the following code based on the error message received when runnning it.\n\nCode:\n\n```python\n\n{code}```\n\nErrors:{errors}\n\nONLY ouput the corrected code in the format ```python\n\n<insert corrected code>```.", conversation_id)
+                output, errors, artifacts = execute_code(code, packages)
+                st.write("Execution Errors:")
+                st.write(errors)
+            if artifacts:
+                st.write("Artifacts:")
+                for artifact in artifacts:
+                    img = Image.open(artifact)
+                    st.image(img, use_column_width=True)
 
 if __name__ == "__main__":
     asyncio.run(main())

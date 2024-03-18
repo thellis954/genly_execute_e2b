@@ -87,32 +87,34 @@ async def correct_code(message, conversation_id=None):
     
     return message.content[0].text, message.id
 
-# Function to execute code using E2B
-def execute_code2(code, packages=None):
-    sandbox = e2b.CodeInterpreter(api_key=E2B_API_KEY)
-    if packages:
-        code_pkgs = packages[12:]
-        sandbox.install_python_packages(code_pkgs)
-        
-    stdout, stderr, artifacts_temp = sandbox.run_python(code)
-    artifacts = []
-    for artifact in artifacts_temp:
-        file = artifact.download()
-        artifacts.append(file)
-    sandbox.close()
-    return stdout, stderr, artifacts
+
 def execute_code(code, packages=None):
-    if packages:
-        code_pkgs = packages[12:]
-        os.system(f"pip install {code_pkgs} > temp_install_log.txt 2>&1")
-    with open("temp.py", "w") as file:
-        file.write(code)
-    os.system(f"python temp.py > temp.txt 2>&1")
-    with open("temp.txt", "r") as file:
-        output = file.read()
+    EXECUTE_LOCALLY = os.getenv("EXECUTE_LOCALLY")
+    if EXECUTE_LOCALLY == "True":
+        if packages:
+            code_pkgs = packages[12:]
+            os.system(f"pip install {code_pkgs} > temp_install_log.txt 2>&1")
+            os.system(f"pip3 freeze > requirements.txt")
+        with open("temp.py", "w") as file:
+            file.write(code)
+        os.system(f"python temp.py > temp.txt 2>&1")
+        with open("temp.txt", "r") as file:
+            output = file.read()
 
-    return output, "", []
-
+        return output, "", []
+    else:
+        sandbox = e2b.CodeInterpreter(api_key=E2B_API_KEY)
+        if packages:
+            code_pkgs = packages[12:]
+            sandbox.install_python_packages(code_pkgs)
+            
+        stdout, stderr, artifacts_temp = sandbox.run_python(code)
+        artifacts = []
+        for artifact in artifacts_temp:
+            file = artifact.download()
+            artifacts.append(file)
+        sandbox.close()
+        return stdout, stderr, artifacts
 async def get_llm_analysis(code_output, human_question):
     prompt= f"""
             Take the Code Output below as context, and the original human question, and write a user friendly, html-markup formatted response to the human question - including links, sources and/or images if relevant.\n\n

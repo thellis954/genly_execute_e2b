@@ -88,7 +88,7 @@ async def correct_code(message, conversation_id=None):
     return message.content[0].text, message.id
 
 # Function to execute code using E2B
-def execute_code(code, packages=None):
+def execute_code2(code, packages=None):
     sandbox = e2b.CodeInterpreter(api_key=E2B_API_KEY)
     if packages:
         code_pkgs = packages[12:]
@@ -101,6 +101,55 @@ def execute_code(code, packages=None):
         artifacts.append(file)
     sandbox.close()
     return stdout, stderr, artifacts
+def execute_code(code, packages=None):
+    with open("temp.py", "w") as file:
+        file.write(code)
+    os.system(f"python temp.py > temp.txt 2>&1")
+    with open("temp.txt", "r") as file:
+        output = file.read()
+
+    return output, "", []
+async def get_llm_analysis(code_output, human_question):
+    prompt= f"""
+            Take the Code Output below as context, and the original human question, and write a user friendly, html-markup formatted response to the human question - including links, sources and/or images if relevant.\n\n
+            Code Output: {code_output}\n\n
+            Human Request: {human_question}\n\n
+            Answer:\n\n
+        """
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+    message = await client.messages.create(
+        model=ANTHROPIC_MODEL,
+        max_tokens=MODEL_MAX_TOKENS,
+        temperature=0.8,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    )
+    msg = message.content[0].text
+    return msg
+
+def parse_response(response):
+    # Extract the code from Claude3's response
+    code_start = response.find("```python")
+    code_end = response.find("```", code_start + 1)
+    pip_start = response.find("```pip")
+    pip_end = response.find("```", pip_start + 1)
+
+    if code_start != -1 and code_end != -1:
+        if pip_start != -1 and pip_end != -1:
+            packages = response[pip_start + 6:pip_end].strip()
+        else:
+            packages = None    
+        code = response[code_start + 9:code_end].strip()
+    return code, packages
 
 
 # Streamlit app
@@ -121,24 +170,12 @@ async def main():
         with st.spinner("Thinking..."):
             response, conversation_id = await send_message(user_input, st.session_state.conversation_id, st.session_state.context)
             st.session_state.conversation_id = conversation_id
+            code, packages = parse_response(response)
 
         with st.expander("Claude3's Response and Code", expanded=False):
             # Display Claude3's response
             st.write("Claude3's Response:")
             st.write(response)
-
-        # Extract the code from Claude3's response
-        code_start = response.find("```python")
-        code_end = response.find("```", code_start + 1)
-        pip_start = response.find("```pip")
-        pip_end = response.find("```", pip_start + 1)
-
-        if code_start != -1 and code_end != -1:
-            if pip_start != -1 and pip_end != -1:
-                packages = response[pip_start + 6:pip_end].strip()
-            else:
-                packages = None    
-            code = response[code_start + 9:code_end].strip()
 
             with st.spinner("Running the code"):
                 # Execute the code using E2B
@@ -147,89 +184,57 @@ async def main():
                     errors = ""
 
             
-            while errors or output.find("Failed to retrieve") != -1 or output.find("Status code:") != -1:
-                st.write("Execution Errors:")
-                st.write(output + "\n" + errors)
-                with st.spinner("Correcting my code"):
-                    prompt = f"""Please review the following code and the resulting error. Then, fix the code or come up with a new approach to accomplish the original human request, and write new code to accomplish the request. ONLY respond with python code and nothing else.\n\n
-                    Code:\n\n
-                    ```python\n\n{code}```\n\n
-                    
-                    Errors:{output + errors}\n\n
+        while errors or output.find("Failed to retrieve") != -1 or output.find("Status code:") != -1:
+            st.write("Execution Errors:")
+            st.write(output + "\n" + errors)
+            with st.spinner("Correcting my code"):
+                prompt = f"""Please review the following code and the resulting error. Then, fix the code or come up with a new approach to accomplish the original human request, and write new code to accomplish the request. ONLY respond with python code and nothing else.\n\n
+                Code:\n\n
+                ```python\n\n{code}```\n\n
                 
-                    
-                    Response FORMAT example:\n\n
-                    ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES
-                    ```pip\n\n 
-                    pip install requests
-                    ```
-                    ###END OPTIONAL
-                    ```python\n\n
-                    <insert code>
-                    ```
-                    Human Request: {user_input}\n\n
-                    Additional Context: {st.session_state.context}\n\n
-                    Answer: 
-                    ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES
-                    ```pip\n\n
-                    pip install <insert required packages> 
-                    ```
-                    ###END OPTIONAL
-                    ```python\n\n
-                    ```
-                """
-                response, conversation_id = await correct_code(prompt, conversation_id)
-                with st.expander("Corrected Code", expanded=False):
-                    st.write(response)
-                with st.spinner("Running the corrected code"):
-                    # Extract the code from Claude3's response
-                    code_start = response.find("```python")
-                    code_end = response.find("```", code_start + 1)
-                    pip_start = response.find("```pip")
-                    pip_end = response.find("```", pip_start + 1)
-                    if pip_start != -1 and pip_end != -1:
-                        packages = response[pip_start + 6:pip_end].strip()
-                    else:
-                        packages = None    
-                    code = response[code_start + 9:code_end].strip()
-                    output, errors, artifacts = execute_code(code, packages)
-            # Display the execution output
+                Errors:{output + errors}\n\n
             
-            st.write("Execution Output:")
-            #st.markdown(output, unsafe_allow_html=True)
-
-            if artifacts:
-                st.write("Artifacts:")
-                for artifact in artifacts:
-                    img = Image.open(io.BytesIO(artifact))
-                    width = img.width
-                    height = img.height
-                    st.image(img, use_column_width=True)
-            else:
-                prompt= f"""
-                    Take the Code Output below as context, and the original human question, and write a user friendly, html-markup formatted response to the human question - including sources and/or images if relevant.\n\n
-                    Code Output: {output}\n\n
-                    Human Request: {user_input}\n\n
-                    Answer:\n\n
-                """
-                client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-                message = await client.messages.create(
-                    model=ANTHROPIC_MODEL,
-                    max_tokens=MODEL_MAX_TOKENS,
-                    temperature=0.8,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": prompt
-                                }
-                            ]
-                        }
-                    ]
-                )
-                msg = message.content[0].text
-                st.markdown(msg, unsafe_allow_html=True)
+                
+                Response FORMAT example:\n\n
+                ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES
+                ```pip\n\n 
+                pip install requests
+                ```
+                ###END OPTIONAL
+                ```python\n\n
+                <insert code>
+                ```
+                Human Request: {user_input}\n\n
+                Additional Context: {st.session_state.context}\n\n
+                Answer: 
+                ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES
+                ```pip\n\n
+                pip install <insert required packages> 
+                ```
+                ###END OPTIONAL
+                ```python\n\n
+                ```
+            """
+            response, conversation_id = await correct_code(prompt, conversation_id)
+            with st.expander("Corrected Code", expanded=False):
+                st.write(response)
+            with st.spinner("Running the corrected code"):
+                code, packages = parse_response(response)
+                output, errors, artifacts = execute_code(code, packages)
+        # Display the execution output
+            
+        st.write("Execution Output:")
+        #st.markdown(output, unsafe_allow_html=True)
+        
+        msg = await get_llm_analysis(output, user_input)
+        st.markdown(msg, unsafe_allow_html=True)
+        if artifacts:
+            st.write("Artifacts:")
+            for artifact in artifacts:
+                img = Image.open(io.BytesIO(artifact))
+                width = img.width
+                height = img.height
+                st.image(img, use_column_width=True)
+                
 if __name__ == "__main__":
     asyncio.run(main())

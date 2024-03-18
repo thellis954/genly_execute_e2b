@@ -2,3 +2,4 @@
 .env
 temp.py
 temp.txt
+credentials.json

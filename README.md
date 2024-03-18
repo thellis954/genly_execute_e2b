@@ -23,10 +23,13 @@ NEEDED FOR FULL FUNCTIONALITY: Would need to actually provide the "recipes" and 
 3. Install the requirements:
 
     ```bash
+    python3 -m venv .venv --prompt="genly_execute_e2b"
+    source .venv/bin/activate
     pip install -r requirements.txt
+    streamlit run main.py
     ```
 
-## Usage
+## DEBUGGING Usage
 
 1. Open the project in VSCode.
 

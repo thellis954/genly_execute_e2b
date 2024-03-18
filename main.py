@@ -102,6 +102,9 @@ def execute_code2(code, packages=None):
     sandbox.close()
     return stdout, stderr, artifacts
 def execute_code(code, packages=None):
+    if packages:
+        code_pkgs = packages[12:]
+        os.system(f"pip install {code_pkgs} > temp_install_log.txt 2>&1")
     with open("temp.py", "w") as file:
         file.write(code)
     os.system(f"python temp.py > temp.txt 2>&1")
@@ -109,6 +112,7 @@ def execute_code(code, packages=None):
         output = file.read()
 
     return output, "", []
+
 async def get_llm_analysis(code_output, human_question):
     prompt= f"""
             Take the Code Output below as context, and the original human question, and write a user friendly, html-markup formatted response to the human question - including links, sources and/or images if relevant.\n\n
@@ -222,9 +226,9 @@ async def main():
                 code, packages = parse_response(response)
                 output, errors, artifacts = execute_code(code, packages)
         # Display the execution output
-            
-        st.write("Execution Output:")
-        #st.markdown(output, unsafe_allow_html=True)
+        with st.expander("Execution Output", expanded=False):
+            st.write("Execution Output:")
+            st.markdown(output, unsafe_allow_html=True)
         
         msg = await get_llm_analysis(output, user_input)
         st.markdown(msg, unsafe_allow_html=True)

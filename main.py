@@ -22,12 +22,12 @@ E2B_API_KEY = os.environ["E2B_API_KEY"]
 # Function to send a message to Claude3 and get the response
 async def send_message(message, conversation_id=None, context=None):
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-    prompt=f"""You are a helpful assistant who can write python code that return values that help to answer user requests. All the code you write will be in python. For your code blocks, your code should be in this format ```python\n\n <insert code>``` ```pip\n\npip install <insert required packages> (optional)```. You should never respond saying you do not have the ability to do something. Always respond with code that would accomplish the user's request. For example, if I ask you to search the internet, you could write code to search the internet. If I ask you to play a game, you could write code to play a game. If I ask you to write a poem, you could write code to generate a poem. If I ask you to write a story, you could write code to generate a story. If I ask you to write a song, you could write code to generate a song. If you write code that uses an API or SDK, ensure you include code to authenticate the user using OAuth in a browser, or via API key if you are provided one.
+    prompt=f"""You are a helpful assistant who can write python code that return values that help to answer user requests. All the code you write will be in python. For your code blocks, your code should be in this format ```python\n\n <insert code>``` ```pip\n\npip install <insert required packages> (optional)```. You should never respond saying you do not have the ability to do something. Always respond with code that would accomplish the user's request. For example, if I ask you to search the internet, you could write code to search the internet. If I ask you to play a game, you could write code to play a game. If I ask you to write a poem, you could write code to generate a poem. If I ask you to write a story, you could write code to generate a story. If I ask you to write a song, you could write code to generate a song. If you write code that uses an API or SDK, if authentication is required for the API or SDK, ensure you include code to authenticate the user using OAuth in a browser, or via API key if you are provided one in the Additional Context.
                     
                     Response FORMAT example:\n\n
-                    ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES
+                    ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES - include all libraries on one line after 'pip install'
                     ```pip\n\n 
-                    pip install requests
+                    pip install requests python-dotenv
                     ```
                     ###END OPTIONAL
                     ```python\n\n
@@ -157,6 +157,15 @@ def parse_response(response):
         code = response[code_start + 9:code_end].strip()
     return code, packages
 
+def cleanup():
+    if os.path.exists("temp.py"):
+        os.remove("temp.py")
+    if os.path.exists("temp.txt"):
+        os.remove("temp.txt")
+    if os.path.exists("temp_install_log.txt"):
+        os.remove("temp_install_log.txt")
+    if os.path.exists("token.json"):
+        os.remove("token.json")
 
 # Streamlit app
 async def main():
@@ -202,7 +211,7 @@ async def main():
             
                 
                 Response FORMAT example:\n\n
-                ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES
+                ###OPTIONAL IF YOU NEED TO INSTALL PACKAGES - include all libraries on one line after 'pip install'
                 ```pip\n\n 
                 pip install requests
                 ```
@@ -241,6 +250,6 @@ async def main():
                 width = img.width
                 height = img.height
                 st.image(img, use_column_width=True)
-                
+        cleanup()            
 if __name__ == "__main__":
     asyncio.run(main())

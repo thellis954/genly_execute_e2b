@@ -14,14 +14,18 @@ load_dotenv()
 
 # Set up the Anthropic API key
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL")
+MODEL_MAX_TOKENS = os.getenv("MODEL_MAX_TOKENS")
+MODEL_TEMPERATURE = os.getenv("MODEL_TEMPERATURE")
 E2B_API_KEY = os.environ["E2B_API_KEY"]
+
 # Function to send a message to Claude3 and get the response
 async def send_message(message, conversation_id=None):
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     message = await client.messages.create(
-        model="claude-3-opus-20240229",
-        max_tokens=2000,
-        temperature=0.2,
+        model=ANTHROPIC_MODEL,
+        max_tokens=MODEL_MAX_TOKENS,
+        temperature=MODEL_TEMPERATURE,
         system="You are a helpful assistant who can write code to answer user requests. All the code you write will be in python. For your code blocks, your code should be in this format ```python\n\n <insert code>``` ```pip\n\npip install <insert required packages> (optional)```. You should never respond saying you do not have the ability to do something. Always respond with code that would accomplish the user's request. For example, if I ask you to search the internet, you could write code to search the internet. If I ask you to play a game, you could write code to play a game. If I ask you to write a poem, you could write code to generate a poem. If I ask you to write a story, you could write code to generate a story. If I ask you to write a song, you could write code to generate a song. If you are going to need an API key for code you are writing, ask the user for the API key ahead of writing your code. Once the user provides any necessary API keys, then write the code to accomplish the user's requests.",
         messages=[
             {
@@ -42,9 +46,9 @@ async def send_message(message, conversation_id=None):
 async def correct_code(message, conversation_id=None):
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     message = await client.messages.create(
-        model="claude-3-opus-20240229",
-        max_tokens=2000,
-        temperature=0.2,
+        model=ANTHROPIC_MODEL,
+        max_tokens=MODEL_MAX_TOKENS,
+        temperature=MODEL_TEMPERATURE,
         messages=[
             {
                 "role": "user",

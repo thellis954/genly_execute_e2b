@@ -196,7 +196,7 @@ async def main():
             # Display the execution output
             
             st.write("Execution Output:")
-            st.markdown(output, unsafe_allow_html=True)
+            #st.markdown(output, unsafe_allow_html=True)
 
             if artifacts:
                 st.write("Artifacts:")
@@ -205,6 +205,31 @@ async def main():
                     width = img.width
                     height = img.height
                     st.image(img, use_column_width=True)
-
+            else:
+                prompt= f"""
+                    Take the Code Output below as context, and the original human question, and write a user friendly, html-markup formatted response to the human question - including sources and/or images if relevant.\n\n
+                    Code Output: {output}\n\n
+                    Human Request: {user_input}\n\n
+                    Answer:\n\n
+                """
+                client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+                message = await client.messages.create(
+                    model=ANTHROPIC_MODEL,
+                    max_tokens=MODEL_MAX_TOKENS,
+                    temperature=0.8,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": prompt
+                                }
+                            ]
+                        }
+                    ]
+                )
+                msg = message.content[0].text
+                st.markdown(msg, unsafe_allow_html=True)
 if __name__ == "__main__":
     asyncio.run(main())

@@ -118,10 +118,13 @@ def execute_code(code, packages=None):
         return stdout, stderr, artifacts
 async def get_llm_analysis(code_output, human_question):
     prompt= f"""
-            Take the Code Output below as context, and the original human question, and write a user friendly, html-markup formatted response to the human question - including links, sources and/or images if relevant.\n\n
-            Code Output: {code_output}\n\n
-            Human Request: {human_question}\n\n
-            Answer:\n\n
+            Objective: Based on the human request below, and the resulting code output, provide a summary of what was asked, and a summary of the output. If the code output is not what was expected, provide a summary of what went wrong. If the code output is what was expected, provide a summary of what was accomplished.\n\n
+
+            Human Request: {human_question}
+
+            Code Output: {code_output}
+
+            Summary: \n\n
         """
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     message = await client.messages.create(

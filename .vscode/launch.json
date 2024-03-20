@@ -12,7 +12,7 @@
             "program": ".venv/bin/streamlit",
             "args": [
                 "run",
-                "main.py"
+                "main_new.py"
             ],
             
             "cwd": "${workspaceFolder}",
